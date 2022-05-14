@@ -134,6 +134,10 @@ contract MyContract {
     function checkBalance(address addr) public view returns(uint256) {
         return addr.balance;
     }
+    
+    function destroy() public onlyBy(owner) {
+        selfdestruct(payable(owner));
+    }
 
     receive() external payable {}
 }
