@@ -2,7 +2,7 @@
 pragma solidity ^0.8.13;
 
 contract MyContract {
-    uint8[3] taxes;
+    uint8[3] public taxes;
     address[3] public govAddresses;
     uint256[3] public gatheredVat;
 
@@ -92,7 +92,7 @@ contract MyContract {
     ) public payable {
         require(checkIndexValidity(idx), "Invalid index, [0, 1, 2] available");
         require(checkBalance(msg.sender) > msg.value, "Insufficient funds");
-        require(utfStringLength(comment) <= 80);
+        require(utfStringLength(comment) <= 80, "Comment > 80 characters");
 
         uint256 tax = (msg.value * taxes[idx]) / 100;
 
