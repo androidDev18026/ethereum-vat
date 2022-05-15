@@ -1,52 +1,66 @@
-
+// SPDX-License-Identifier: MIT
 pragma solidity ^0.8.13;
 
 contract MyContract {
 
-    mapping(uint8 => uint8) public taxes;
-    mapping(uint8 => address) public govAddresses;
-    mapping(uint8 => uint256) public gatheredVat;
-    mapping(uint256 => uint256) public largestProceedID;
+    uint8[3] taxes;
+    address[3] public govAddresses;
+    uint256[3] public gatheredVat;
+    
+    mapping(uint256 => uint256) private proceedPerId;
+
+    struct VatLevels {
+        uint8 high;
+        uint8 mid;
+        uint8 low;
+    }
+
+    struct MaxProceeds {
+        uint256 id;
+        address addr;
+    }
 
     address public owner;
-    address public maxProceedsAddress;
-    uint256 public maxProceedsID;
-    uint256 public maxProceeds;
+    VatLevels public vatLevels = VatLevels(24, 13, 6);
+    MaxProceeds private s_maxProceeds;
+    uint256 private maxProceeds;
+    uint256 constant public MAX_NONVAT = 50000000000000000;
 
     constructor(address gov1, address gov2, address gov3) {
         owner = msg.sender;
         maxProceeds = 0;
-        taxes[0] = 24;
-        govAddresses[0] = gov1;
-        taxes[1] = 13;
-        govAddresses[1] = gov2;
-        taxes[2] = 6;
-        govAddresses[2] = gov3;
-        gatheredVat[0] = 0;
-        gatheredVat[1] = 0;
-        gatheredVat[2] = 0;
+
+        taxes = [vatLevels.high, vatLevels.mid, vatLevels.low];
+        govAddresses = [gov1, gov2, gov3];
+        gatheredVat = [0, 0, 0];
     }
 
-    modifier onlyBy(address _account) {
+    modifier onlyOwner {
       require(
-         msg.sender == _account,
-         "Sender not authorized."
+         msg.sender == owner,
+         "Unauthorized access"
       );
       _;
     }
 
-    event SendSimpleTx(address from, address to, uint256 amount);
-    event SendTx2(address from, address to, address gov, uint256 amount, uint256 tax);
-    event SendTx3(address from, address to, address gov, uint256 amount, 
-    uint256 tax, string comment, uint comm_size);
+    modifier costs(uint amount) {
+      require(
+         msg.value <= amount,
+         "Exceeded max limit."
+      );
+      _;
+    }
+
+    event LogMsg1(address to, uint256 amount);
+    event LogMsg2(address to, uint256 amount, uint8 vatLevel);
+    event LogMsg3(address to, uint256 amount, uint8 vatLevel, string comment);
 
 
-    function sendFunds(address destination) public payable {
-        require(msg.value <= 50000000000000000);
+    function sendFunds(address destination) public payable costs(MAX_NONVAT) {
         require(checkBalance(msg.sender) > msg.value);
 
         payable(destination).transfer(msg.value);
-        emit SendSimpleTx(msg.sender, destination, msg.value);
+        emit LogMsg1(destination, msg.value);
     }
 
     function sendFunds(address destination, uint taxId, uint8 idx) public payable {
@@ -58,16 +72,16 @@ contract MyContract {
         payable(destination).transfer(msg.value - tax);
         payable(govAddresses[idx]).transfer(tax);
 
-        largestProceedID[taxId] += msg.value - tax;
+        proceedPerId[taxId] += msg.value - tax;
         gatheredVat[idx] += tax;
 
-        if (largestProceedID[taxId] > maxProceeds) {
-            maxProceedsID = taxId;
-            maxProceedsAddress = destination;
-            maxProceeds = largestProceedID[taxId];
+        if (proceedPerId[taxId] > maxProceeds) {
+            s_maxProceeds.id = taxId;
+            s_maxProceeds.addr = destination;
+            maxProceeds = proceedPerId[taxId];
         }
 
-        emit SendTx2(msg.sender, destination, govAddresses[idx], msg.value, tax);
+        emit LogMsg2(destination, msg.value, idx);
     }
 
     function sendFunds(address destination, uint taxId, uint8 idx, 
@@ -82,15 +96,15 @@ contract MyContract {
         payable(govAddresses[idx]).transfer(tax);
         
         gatheredVat[idx] += tax;
-        largestProceedID[taxId] += msg.value - tax;
+        proceedPerId[taxId] += msg.value - tax;
 
-        if (largestProceedID[taxId] > maxProceeds) {
-            maxProceedsID = taxId;
-            maxProceedsAddress = destination;
-            maxProceeds = largestProceedID[taxId];
+        if (proceedPerId[taxId] > maxProceeds) {
+            s_maxProceeds.id = taxId;
+            s_maxProceeds.addr = destination;
+            maxProceeds = proceedPerId[taxId];
         }
 
-        emit SendTx3(msg.sender, destination, govAddresses[idx], msg.value, tax, comment, utfStringLength(comment));
+        emit LogMsg3(destination, msg.value, idx, comment);
     }
 
     function utfStringLength(string memory str) pure internal returns (uint length) {
@@ -123,8 +137,8 @@ contract MyContract {
         return (gatheredVat[0] + gatheredVat[1] + gatheredVat[2]);
     }
 
-    function getMaxProceedsPerson() public onlyBy(owner) returns(uint256, address) {
-        return (maxProceedsID, maxProceedsAddress);
+    function getMaxProceedsPerson() public view onlyOwner returns(uint256, address) {
+        return (s_maxProceeds.id, s_maxProceeds.addr);
     }
     
     function checkIndexValidity(uint8 index) public pure returns(bool) {
@@ -135,7 +149,7 @@ contract MyContract {
         return addr.balance;
     }
     
-    function destroy() public onlyBy(owner) {
+    function destroy() public onlyOwner {
         selfdestruct(payable(owner));
     }
 
