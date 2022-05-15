@@ -1,5 +1,7 @@
 # ethereum-vat
 
+<img src="https://d33wubrfki0l68.cloudfront.net/fcd4ecd90386aeb50a235ddc4f0063cfbb8a7b66/4295e/static/bfc04ac72981166c740b189463e1f74c/40129/eth-diamond-black-white.jpg" width="300" height="250">
+
 # Aristotle University of Thessaloniki
 ## Data & Web Science MSc Program
 ### ***Decentralized Technologies Course***
