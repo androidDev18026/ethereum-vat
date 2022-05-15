@@ -6,7 +6,7 @@ contract MyContract {
     uint8[3] taxes;
     address[3] public govAddresses;
     uint256[3] public gatheredVat;
-    
+
     mapping(uint256 => uint256) private proceedPerId;
 
     struct VatLevels {
@@ -55,17 +55,16 @@ contract MyContract {
     event LogMsg2(address to, uint256 amount, uint8 vatLevel);
     event LogMsg3(address to, uint256 amount, uint8 vatLevel, string comment);
 
-
     function sendFunds(address destination) public payable costs(MAX_NONVAT) {
-        require(checkBalance(msg.sender) > msg.value);
+        require(checkBalance(msg.sender) > msg.value, "Insufficient funds");
 
         payable(destination).transfer(msg.value);
         emit LogMsg1(destination, msg.value);
     }
 
     function sendFunds(address destination, uint taxId, uint8 idx) public payable {
-        require(checkIndexValidity(idx));
-        require(checkBalance(msg.sender) > msg.value);
+        require(checkIndexValidity(idx), "Invalid index, [0, 1, 2] available");
+        require(checkBalance(msg.sender) > msg.value, "Insufficient funds");
 
         uint256 tax = msg.value * taxes[idx] / 100 ;
 
@@ -86,8 +85,8 @@ contract MyContract {
 
     function sendFunds(address destination, uint taxId, uint8 idx, 
     string memory comment) public payable {
-        require(checkIndexValidity(idx));
-        require(checkBalance(msg.sender) > msg.value);
+        require(checkIndexValidity(idx), "Invalid index, [0, 1, 2] available");
+        require(checkBalance(msg.sender) > msg.value, "Insufficient funds");
         require(utfStringLength(comment) <= 80);
 
         uint256 tax = msg.value * taxes[idx] / 100 ;
@@ -129,7 +128,7 @@ contract MyContract {
     }
 
     function getVatForLevel(uint8 level) public view returns(uint256) {
-        require(checkIndexValidity(level));
+        assert(checkIndexValidity(level));
         return gatheredVat[level];
     }
 
@@ -137,8 +136,8 @@ contract MyContract {
         return (gatheredVat[0] + gatheredVat[1] + gatheredVat[2]);
     }
 
-    function getMaxProceedsPerson() public view onlyOwner returns(uint256, address) {
-        return (s_maxProceeds.id, s_maxProceeds.addr);
+    function getMaxProceedsPerson() public view onlyOwner returns(uint256, address, uint256) {
+        return (s_maxProceeds.id, s_maxProceeds.addr, proceedPerId[s_maxProceeds.id]);
     }
     
     function checkIndexValidity(uint8 index) public pure returns(bool) {
