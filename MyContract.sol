@@ -152,7 +152,7 @@ contract GovDapp {
         emit LogMsg2(destination, msg.value, idx);
     }
 
-    // Same as function above with the added functionality of adding comment
+    // Same as function above with the added functionality of comments
     function sendFunds(
         address destination,
         uint256 taxId,
