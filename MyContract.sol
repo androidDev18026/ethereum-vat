@@ -2,7 +2,6 @@
 pragma solidity ^0.8.13;
 
 contract MyContract {
-
     uint8[3] taxes;
     address[3] public govAddresses;
     uint256[3] public gatheredVat;
@@ -24,9 +23,13 @@ contract MyContract {
     VatLevels public vatLevels = VatLevels(24, 13, 6);
     MaxProceeds private s_maxProceeds;
     uint256 private maxProceeds;
-    uint256 constant public MAX_NONVAT = 50000000000000000;
+    uint256 public constant MAX_NONVAT = 50000000000000000;
 
-    constructor(address gov1, address gov2, address gov3) {
+    constructor(
+        address gov1,
+        address gov2,
+        address gov3
+    ) {
         owner = msg.sender;
         maxProceeds = 0;
 
@@ -35,20 +38,14 @@ contract MyContract {
         gatheredVat = [0, 0, 0];
     }
 
-    modifier onlyOwner {
-      require(
-         msg.sender == owner,
-         "Unauthorized access"
-      );
-      _;
+    modifier onlyOwner() {
+        require(msg.sender == owner, "Unauthorized access");
+        _;
     }
 
-    modifier costs(uint amount) {
-      require(
-         msg.value <= amount,
-         "Exceeded max limit."
-      );
-      _;
+    modifier costs(uint256 amount) {
+        require(msg.value <= amount, "Exceeded max limit.");
+        _;
     }
 
     event LogMsg1(address to, uint256 amount);
@@ -62,11 +59,15 @@ contract MyContract {
         emit LogMsg1(destination, msg.value);
     }
 
-    function sendFunds(address destination, uint taxId, uint8 idx) public payable {
+    function sendFunds(
+        address destination,
+        uint256 taxId,
+        uint8 idx
+    ) public payable {
         require(checkIndexValidity(idx), "Invalid index, [0, 1, 2] available");
         require(checkBalance(msg.sender) > msg.value, "Insufficient funds");
 
-        uint256 tax = msg.value * taxes[idx] / 100 ;
+        uint256 tax = (msg.value * taxes[idx]) / 100;
 
         payable(destination).transfer(msg.value - tax);
         payable(govAddresses[idx]).transfer(tax);
@@ -83,17 +84,21 @@ contract MyContract {
         emit LogMsg2(destination, msg.value, idx);
     }
 
-    function sendFunds(address destination, uint taxId, uint8 idx, 
-    string memory comment) public payable {
+    function sendFunds(
+        address destination,
+        uint256 taxId,
+        uint8 idx,
+        string memory comment
+    ) public payable {
         require(checkIndexValidity(idx), "Invalid index, [0, 1, 2] available");
         require(checkBalance(msg.sender) > msg.value, "Insufficient funds");
         require(utfStringLength(comment) <= 80);
 
-        uint256 tax = msg.value * taxes[idx] / 100 ;
+        uint256 tax = (msg.value * taxes[idx]) / 100;
 
         payable(destination).transfer(msg.value - tax);
         payable(govAddresses[idx]).transfer(tax);
-        
+
         gatheredVat[idx] += tax;
         proceedPerId[taxId] += msg.value - tax;
 
@@ -106,48 +111,59 @@ contract MyContract {
         emit LogMsg3(destination, msg.value, idx, comment);
     }
 
-    function utfStringLength(string memory str) pure internal returns (uint length) {
-        uint i=0;
+    function utfStringLength(string memory str)
+        internal
+        pure
+        returns (uint256 length)
+    {
+        uint256 i = 0;
         bytes memory string_rep = bytes(str);
 
-        while (i<string_rep.length)
-        {
-            if (string_rep[i]>>7==0)
-                i+=1;
-            else if (string_rep[i]>>5==bytes1(uint8(0x6)))
-                i+=2;
-            else if (string_rep[i]>>4==bytes1(uint8(0xE)))
-                i+=3;
-            else if (string_rep[i]>>3==bytes1(uint8(0x1E)))
-                i+=4;
-            else
-                i+=1;
+        while (i < string_rep.length) {
+            if (string_rep[i] >> 7 == 0) i += 1;
+            else if (string_rep[i] >> 5 == bytes1(uint8(0x6))) i += 2;
+            else if (string_rep[i] >> 4 == bytes1(uint8(0xE))) i += 3;
+            else if (string_rep[i] >> 3 == bytes1(uint8(0x1E))) i += 4;
+            else i += 1;
 
             length++;
         }
     }
 
-    function getVatForLevel(uint8 level) public view returns(uint256) {
+    function getVatForLevel(uint8 level) public view returns (uint256) {
         assert(checkIndexValidity(level));
         return gatheredVat[level];
     }
 
-    function totalVat() public view returns(uint256) {
+    function totalVat() public view returns (uint256) {
         return (gatheredVat[0] + gatheredVat[1] + gatheredVat[2]);
     }
 
-    function getMaxProceedsPerson() public view onlyOwner returns(uint256, address, uint256) {
-        return (s_maxProceeds.id, s_maxProceeds.addr, proceedPerId[s_maxProceeds.id]);
+    function getMaxProceedsPerson()
+        public
+        view
+        onlyOwner
+        returns (
+            uint256,
+            address,
+            uint256
+        )
+    {
+        return (
+            s_maxProceeds.id,
+            s_maxProceeds.addr,
+            proceedPerId[s_maxProceeds.id]
+        );
     }
-    
-    function checkIndexValidity(uint8 index) public pure returns(bool) {
-        return (index == 0 || index == 1 || index == 2);
-    } 
 
-    function checkBalance(address addr) public view returns(uint256) {
+    function checkIndexValidity(uint8 index) public pure returns (bool) {
+        return (index == 0 || index == 1 || index == 2);
+    }
+
+    function checkBalance(address addr) public view returns (uint256) {
         return addr.balance;
     }
-    
+
     function destroy() public onlyOwner {
         selfdestruct(payable(owner));
     }
