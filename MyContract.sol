@@ -102,7 +102,7 @@ contract GovDapp {
     */
     function sendFunds(address destination) public payable costs(MAX_NONVAT) {
         // Make sure sender has the funds
-        require(checkBalance(msg.sender) > msg.value, "Insufficient funds");
+        require(getBalance(msg.sender) > msg.value, "Insufficient funds");
 
         // Transfer the funds without taking VAT into account
         payable(destination).transfer(msg.value);
@@ -120,7 +120,7 @@ contract GovDapp {
         uint8 idx
     ) public payable {
         require(checkIndexValidity(idx), "Invalid index, [0, 1, 2] available");
-        require(checkBalance(msg.sender) > msg.value, "Insufficient funds");
+        require(getBalance(msg.sender) > msg.value, "Insufficient funds");
 
         // Calculate the VAT based on the index argument
         uint256 tax = (msg.value * taxes[idx]) / 100;
@@ -160,7 +160,7 @@ contract GovDapp {
         string memory comment
     ) public payable {
         require(checkIndexValidity(idx), "Invalid index, [0, 1, 2] available");
-        require(checkBalance(msg.sender) > msg.value, "Insufficient funds");
+        require(getBalance(msg.sender) > msg.value, "Insufficient funds");
         // Make sure the comment is not over the character limit
         require(
             utfStringLength(comment) <= MAX_SENTENCE_LENGTH,
@@ -244,7 +244,7 @@ contract GovDapp {
     }
 
     // Returns the balance of address
-    function checkBalance(address addr) public view returns (uint256) {
+    function getBalance(address addr) public view returns (uint256) {
         return addr.balance;
     }
 
