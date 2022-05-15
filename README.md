@@ -39,6 +39,7 @@ This functionality should be available only to the user that deployed the contra
 
 ## TODO
 - [ ] Add comments
+- [ ] Add struct for printing person with most proceeds
 
 *Notes*:
 
