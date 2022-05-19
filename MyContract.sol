@@ -58,7 +58,7 @@ contract GovDapp {
     // Define constructor that accepts 3 gov. addresses
     constructor(address[] memory addresses) {
         // Make sure the deployed contract has 3 goverment addresses
-        require(addresses.length == 3, 'Goverment addresses must be exactly 3');
+        require(addresses.length == 3, "Goverment addresses must be exactly 3");
         // Owner of the contract is the one deploying it
         owner = msg.sender;
         // Initialize proceeds
