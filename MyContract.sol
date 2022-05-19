@@ -14,10 +14,9 @@ Date: 15/05/22
 */
 
 contract GovDapp {
-    // Array to store 3 VAT levels specified (24%, 13%, 6%)
     uint8[3] public taxes;
     // List of goverment controlled addresses for each level
-    address[3] public govAddresses;
+    address[] public govAddresses;
     // Array to store accumulated VAT for each level
     uint256[3] public gatheredVat;
 
@@ -57,19 +56,19 @@ contract GovDapp {
     uint16 public constant MAX_SENTENCE_LENGTH = 80;
 
     // Define constructor that accepts 3 gov. addresses
-    constructor(
-        address gov1,
-        address gov2,
-        address gov3
-    ) {
+    constructor(address[] memory addresses) {
+        // Make sure the deployed contract has 3 goverment addresses
+        assert(addresses.length == 3);
         // Owner of the contract is the one deploying it
         owner = msg.sender;
         // Initialize proceeds
         maxProceeds = 0;
-
         // Initialize each of the 3 arrays defined with values
         taxes = [vatLevels.high, vatLevels.mid, vatLevels.low];
-        govAddresses = [gov1, gov2, gov3];
+        // This array is dynamic, no real reason
+        govAddresses = new address[](3);
+        govAddresses = addresses;
+
         gatheredVat = [0, 0, 0];
     }
 
@@ -152,7 +151,7 @@ contract GovDapp {
         emit LogMsg2(destination, msg.value, idx);
     }
 
-    // Same as function above with the added functionality of comments
+    // Same as function above with the added functionality of adding comment
     function sendFunds(
         address destination,
         uint256 taxId,
