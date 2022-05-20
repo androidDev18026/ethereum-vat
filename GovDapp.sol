@@ -16,7 +16,7 @@ Date: 15/05/22
 contract GovDapp {
     uint8[3] public taxes;
     // List of goverment controlled addresses for each level
-    address[] public govAddresses;
+    address[] private govAddresses;
     // Array to store accumulated VAT for each level
     uint256[3] public gatheredVat;
 
@@ -58,7 +58,7 @@ contract GovDapp {
     // Define constructor that accepts 3 gov. addresses
     constructor(address[] memory addresses) {
         // Make sure the deployed contract has 3 goverment addresses
-        require(addresses.length == 3, "Goverment addresses must be exactly 3");
+        require(addresses.length >= 3, "Goverment addresses must be at least 3");
         // Owner of the contract is the one deploying it
         owner = msg.sender;
         // Initialize proceeds
@@ -67,7 +67,10 @@ contract GovDapp {
         taxes = [vatLevels.high, vatLevels.mid, vatLevels.low];
         // This array is dynamic, no real reason
         govAddresses = new address[](3);
-        govAddresses = addresses;
+        
+        govAddresses.push(addresses[0]);
+        govAddresses.push(addresses[1]);
+        govAddresses.push(addresses[2]);
 
         gatheredVat = [0, 0, 0];
     }
