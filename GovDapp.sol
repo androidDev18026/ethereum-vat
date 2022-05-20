@@ -17,7 +17,7 @@ contract GovDapp {
     // Array to store 3 VAT levels specified (24%, 13%, 6%)
     uint8[3] public taxes;
     // List of goverment controlled addresses for each level
-    address[] public govAddresses;
+    address[] private govAddresses;
     // Array to store accumulated VAT for each level
     uint256[3] public gatheredVat;
 
