@@ -14,6 +14,7 @@ Date: 15/05/22
 */
 
 contract GovDapp {
+    // Array to store 3 VAT levels specified (24%, 13%, 6%)
     uint8[3] public taxes;
     // List of goverment controlled addresses for each level
     address[] public govAddresses;
@@ -25,7 +26,6 @@ contract GovDapp {
     funds as an associative array mapping TaxID's to
     Wei's
     */
-    mapping(uint256 => uint256) private proceedPerId;
 
     struct VatLevels {
         uint8 high;
@@ -37,6 +37,7 @@ contract GovDapp {
     struct MaxProceeds {
         uint256 id;
         address addr;
+        uint256 myProceeds;
     }
 
     // The owner that deploys the contract
@@ -48,7 +49,8 @@ contract GovDapp {
     recipient with the most proceeds, make sure it's
     private so that a getter method is not exposed
     */
-    MaxProceeds private s_maxProceeds;
+    MaxProceeds[] private s_MaxProceeds;
+    uint256 private m_maxIndex;
     uint256 private maxProceeds;
 
     // Max amount that VAT doesn't apply to (0.05 ETH -> Wei)
@@ -58,7 +60,10 @@ contract GovDapp {
     // Define constructor that accepts 3 gov. addresses
     constructor(address[] memory addresses) {
         // Make sure the deployed contract has 3 goverment addresses
-        require(addresses.length == 3, "Goverment addresses must be exactly 3");
+        require(
+            addresses.length >= 3,
+            "Goverment addresses must be at least 3"
+        );
         // Owner of the contract is the one deploying it
         owner = msg.sender;
         // Initialize proceeds
@@ -67,7 +72,10 @@ contract GovDapp {
         taxes = [vatLevels.high, vatLevels.mid, vatLevels.low];
         // This array is dynamic, no real reason
         govAddresses = new address[](3);
-        govAddresses = addresses;
+
+        govAddresses.push(addresses[0]);
+        govAddresses.push(addresses[1]);
+        govAddresses.push(addresses[2]);
 
         gatheredVat = [0, 0, 0];
     }
@@ -133,19 +141,18 @@ contract GovDapp {
         payable(govAddresses[idx]).transfer(tax);
 
         // Update the proceeds of recipient with the current amount - tax
-        proceedPerId[taxId] += msg.value - tax;
+        (int256 indexRetured, uint256 currentProceeds) = updateProceeds(
+            destination,
+            taxId,
+            msg.value,
+            tax
+        );
+
+        // update the index of receipient with most proceeds in our struct
+        updateBestIndex(indexRetured, currentProceeds);
+
         // Update the total VAT for that level
         gatheredVat[idx] += tax;
-
-        /*
-        Check if the user with the most proceeds has changed
-        after this transaction and update the struct accordingly.
-        */
-        if (proceedPerId[taxId] > maxProceeds) {
-            s_maxProceeds.id = taxId;
-            s_maxProceeds.addr = destination;
-            maxProceeds = proceedPerId[taxId];
-        }
 
         // Emit event if transaction is successful
         emit LogMsg2(destination, msg.value, idx);
@@ -171,16 +178,55 @@ contract GovDapp {
         payable(destination).transfer(msg.value - tax);
         payable(govAddresses[idx]).transfer(tax);
 
-        gatheredVat[idx] += tax;
-        proceedPerId[taxId] += msg.value - tax;
+        // Update the proceeds of recipient with the current amount - tax
+        (int256 indexRetured, uint256 currentProceeds) = updateProceeds(
+            destination,
+            taxId,
+            msg.value,
+            tax
+        );
 
-        if (proceedPerId[taxId] > maxProceeds) {
-            s_maxProceeds.id = taxId;
-            s_maxProceeds.addr = destination;
-            maxProceeds = proceedPerId[taxId];
-        }
+        // update the index of receipient with most proceeds in our struct
+        updateBestIndex(indexRetured, currentProceeds);
+
+        gatheredVat[idx] += tax;
 
         emit LogMsg3(destination, msg.value, idx, comment);
+    }
+
+    function updateProceeds(
+        address destination,
+        uint256 id,
+        uint256 amount,
+        uint256 tax
+    ) private returns (int256, uint256) {
+        int256 foundAddressIndex = searchAddress(destination);
+        uint256 currentProceeds = 0;
+        if (foundAddressIndex != -1) {
+            s_MaxProceeds[uint256(foundAddressIndex)].myProceeds +=
+                amount -
+                tax;
+            currentProceeds = s_MaxProceeds[uint256(foundAddressIndex)]
+                .myProceeds;
+        } else {
+            currentProceeds = amount - tax;
+            s_MaxProceeds.push(MaxProceeds(id, destination, amount - tax));
+        }
+
+        return (foundAddressIndex, currentProceeds);
+    }
+
+    function updateBestIndex(int256 indexRetured, uint256 currentProceeds)
+        private
+    {
+        uint256 bestIndex;
+        if (currentProceeds > maxProceeds) {
+            bestIndex = indexRetured != -1
+                ? uint256(indexRetured)
+                : s_MaxProceeds.length - 1;
+            maxProceeds = currentProceeds;
+            m_maxIndex = bestIndex;
+        }
     }
 
     // Function that returns the length of a string
@@ -231,9 +277,9 @@ contract GovDapp {
         )
     {
         return (
-            s_maxProceeds.id,
-            s_maxProceeds.addr,
-            proceedPerId[s_maxProceeds.id]
+            s_MaxProceeds[m_maxIndex].id,
+            s_MaxProceeds[m_maxIndex].addr,
+            s_MaxProceeds[m_maxIndex].myProceeds
         );
     }
 
@@ -250,6 +296,14 @@ contract GovDapp {
     // Destroys the contract (permitted only by Owner)
     function destroy() public onlyOwner {
         selfdestruct(payable(owner));
+    }
+
+    // Search for address in struct
+    function searchAddress(address addr) private view returns (int256) {
+        for (uint256 i = 0; i < s_MaxProceeds.length; i++)
+            if (s_MaxProceeds[i].addr == addr) return int256(i);
+
+        return -1;
     }
 
     receive() external payable {}
