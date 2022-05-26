@@ -127,6 +127,8 @@ contract GovDapp {
         uint256 taxId,
         uint8 idx
     ) public payable {
+        // check that tax id is not 0
+        require(taxId != 0, "Cannot have tax ID = 0");
         // Check if the VAT index is valid
         require(checkIndexValidity(idx), "Invalid index, [0, 1, 2] available");
 
@@ -177,6 +179,8 @@ contract GovDapp {
         uint8 idx,
         string memory comment
     ) public payable {
+        // check that tax id is not 0
+        require(taxId != 0, "Cannot have tax ID = 0");
         // Check if the VAT index is valid
         require(checkIndexValidity(idx), "Invalid index, [0, 1, 2] available");
         // Make sure the comment is not over the character limit
@@ -189,7 +193,7 @@ contract GovDapp {
         if (!seenId(destination, taxId)) {
             addressToId[destination] = taxId;
         }
-        
+
         // Calculate the tax
         uint256 tax = (msg.value * taxes[idx]) / 100;
 
