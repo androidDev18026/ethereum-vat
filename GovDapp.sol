@@ -14,11 +14,12 @@ Date: 15/05/22
 */
 
 contract GovDapp {
-    uint8[3] public taxes;
+    // Array to store the 3 different VAT levels
+    uint8[3] internal taxes;
     // List of goverment controlled addresses for each level
     address[] private govAddresses;
     // Array to store accumulated VAT for each level
-    uint256[3] public gatheredVat;
+    uint256[3] internal gatheredVat;
 
     /* 
     Store proceeds for each person/address that receives
@@ -26,6 +27,7 @@ contract GovDapp {
     Wei's
     */
     mapping(uint256 => uint256) private proceedPerId;
+    mapping(address => uint256) internal addressToId;
 
     struct VatLevels {
         uint8 high;
@@ -55,7 +57,7 @@ contract GovDapp {
     uint256 public constant MAX_NONVAT = 50000000000000000;
     uint16 public constant MAX_SENTENCE_LENGTH = 80;
 
-    // Define constructor that accepts 3 gov. addresses
+    // Define constructor that accepts list of gov. addresses
     constructor(address[] memory addresses) {
         // Make sure the deployed contract has 3 goverment addresses
         require(addresses.length >= 3, "Goverment addresses must be at least 3");
@@ -65,7 +67,11 @@ contract GovDapp {
         maxProceeds = 0;
         // Initialize each of the 3 arrays defined with values
         taxes = [vatLevels.high, vatLevels.mid, vatLevels.low];
-        // This array is dynamic, no real reason
+        /* 
+        The array to store the gov. controlled addresses is dynamic 
+        so that in can potentially be used to store more than 3
+        addresses in the future
+        */
         govAddresses = new address[](3);
         
         govAddresses.push(addresses[0]);
@@ -100,12 +106,9 @@ contract GovDapp {
 
     /*
     Transfers funds from one address to another only if the amount specified
-    is <= 0.05 ETH
+    is <= 0.05 ETH enforced by the <costs> modifier declared above
     */
     function sendFunds(address destination) public payable costs(MAX_NONVAT) {
-        // Make sure sender has the funds
-        require(getBalance(msg.sender) > msg.value, "Insufficient funds");
-
         // Transfer the funds without taking VAT into account
         payable(destination).transfer(msg.value);
         emit LogMsg1(destination, msg.value);
@@ -115,14 +118,22 @@ contract GovDapp {
     Transfer funds from one address to another given that all prerequisites
     are met, meaning that the sender has the needed funds and a valid VAT level
     is passed as argument
+    params: destination -> address to send funds to
+            taxID -> the tax identification number of the recipient
+            idx -> VAT level for that transaction (0,1,2)
     */
     function sendFunds(
         address destination,
         uint256 taxId,
         uint8 idx
     ) public payable {
+        // Check if the VAT index is valid
         require(checkIndexValidity(idx), "Invalid index, [0, 1, 2] available");
-        require(getBalance(msg.sender) > msg.value, "Insufficient funds");
+
+        // Check for tax id validity
+        if (!seenId(destination, taxId)) {
+            addressToId[destination] = taxId;
+        }
 
         // Calculate the VAT based on the index argument
         uint256 tax = (msg.value * taxes[idx]) / 100;
@@ -154,29 +165,45 @@ contract GovDapp {
         emit LogMsg2(destination, msg.value, idx);
     }
 
-    // Same as function above with the added functionality of adding comment
+    /* Same as function above with the added functionality of adding comment
+    params: destination -> address to send funds to
+            taxID -> the tax identification number of the recipient
+            idx -> VAT level for that transaction (0,1,2)
+            comment -> comment to send along with the tx (< 80 characters)
+    */
     function sendFunds(
         address destination,
         uint256 taxId,
         uint8 idx,
         string memory comment
     ) public payable {
+        // Check if the VAT index is valid
         require(checkIndexValidity(idx), "Invalid index, [0, 1, 2] available");
-        require(getBalance(msg.sender) > msg.value, "Insufficient funds");
         // Make sure the comment is not over the character limit
         require(
             utfStringLength(comment) <= MAX_SENTENCE_LENGTH,
             "Comment >80 characters"
         );
 
+        // Check for tax id validity
+        if (!seenId(destination, taxId)) {
+            addressToId[destination] = taxId;
+        }
+        
+        // Calculate the tax
         uint256 tax = (msg.value * taxes[idx]) / 100;
 
+        // Pay the recipient after subtracting taxes
         payable(destination).transfer(msg.value - tax);
+        // Pay the goverment the amount of tax corresponding to that level
         payable(govAddresses[idx]).transfer(tax);
 
+        // Add current tax to the total amassed for that level 
         gatheredVat[idx] += tax;
+        // Update the proceedings of the recipient
         proceedPerId[taxId] += msg.value - tax;
 
+        // Check to see if the recipient with the most proceeding changed
         if (proceedPerId[taxId] > maxProceeds) {
             s_maxProceeds.id = taxId;
             s_maxProceeds.addr = destination;
@@ -184,6 +211,17 @@ contract GovDapp {
         }
 
         emit LogMsg3(destination, msg.value, idx, comment);
+    }
+
+    function seenId(address addr, uint256 id) internal view returns (bool) {
+        if (addressToId[addr] != 0x0) {
+            if (addressToId[addr] == id) {
+                return true;
+            } else {
+                revert ("Mismatch between provided and stored tax ID");
+            }        
+        } 
+        return false;
     }
 
     // Function that returns the length of a string
@@ -208,7 +246,7 @@ contract GovDapp {
 
     // Returns VAT for each level specified, available to everyone
     function getVatForLevel(uint8 level) public view returns (uint256) {
-        assert(checkIndexValidity(level));
+        require(checkIndexValidity(level), "Invalid index <> 0, 1, 2");
         return gatheredVat[level];
     }
 
@@ -241,13 +279,8 @@ contract GovDapp {
     }
 
     // Checks if the VAT level is in bounds (0,1,2)
-    function checkIndexValidity(uint8 index) public pure returns (bool) {
+    function checkIndexValidity(uint8 index) internal pure returns (bool) {
         return (index == 0 || index == 1 || index == 2);
-    }
-
-    // Returns the balance of address
-    function getBalance(address addr) public view returns (uint256) {
-        return addr.balance;
     }
 
     // Destroys the contract (permitted only by Owner)
