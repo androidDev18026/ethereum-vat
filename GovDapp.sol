@@ -27,8 +27,8 @@ contract GovDapp {
     Wei's
     */
     mapping(uint256 => uint256) private proceedPerId;
-    mapping(address => uint256) internal addressToId;
 
+    // Struct to save all the VAT levels
     struct VatLevels {
         uint8 high;
         uint8 mid;
@@ -40,6 +40,21 @@ contract GovDapp {
         uint256 id;
         address addr;
     }
+
+    // To store if an address is associated with a Tax ID
+    struct AssociatedWithId {
+        uint256 id;
+        bool isAssociated;
+    }
+
+    // Map addresses to tax ids
+    mapping(address => AssociatedWithId) internal addressToId;
+    /* 
+    Keep a list as map of tax ID already in use. This avoids the
+    case of having multiple addresses linked to the same Tax ID
+    since TaxIDs must be unique
+    */
+    mapping(uint256 => bool) internal listOfInvalidIds;
 
     // The owner that deploys the contract
     address public owner;
@@ -54,8 +69,8 @@ contract GovDapp {
     uint256 private maxProceeds;
 
     // Max amount that VAT doesn't apply to (0.05 ETH -> Wei)
-    uint256 public constant MAX_NONVAT = 50000000000000000;
-    uint16 public constant MAX_SENTENCE_LENGTH = 80;
+    uint256 internal constant MAX_NONVAT = 50000000000000000;
+    uint16 internal constant MAX_SENTENCE_LENGTH = 80;
 
     // Define constructor that accepts list of gov. addresses
     constructor(address[] memory addresses) {
@@ -69,7 +84,7 @@ contract GovDapp {
         taxes = [vatLevels.high, vatLevels.mid, vatLevels.low];
         /* 
         The array to store the gov. controlled addresses is dynamic 
-        so that in can potentially be used to store more than 3
+        so that in can potentially be extended to store more than 3
         addresses in the future
         */
         govAddresses = new address[](3);
@@ -127,14 +142,15 @@ contract GovDapp {
         uint256 taxId,
         uint8 idx
     ) public payable {
-        // check that tax id is not 0
-        require(taxId != 0, "Cannot have tax ID = 0");
         // Check if the VAT index is valid
         require(checkIndexValidity(idx), "Invalid index, [0, 1, 2] available");
 
         // Check for tax id validity
         if (!seenId(destination, taxId)) {
-            addressToId[destination] = taxId;
+            // Associate address with id if we see them for the 1st time 
+            addressToId[destination] = AssociatedWithId(taxId, true);
+            // Afterwards, mark this Tax ID as invalid
+            listOfInvalidIds[taxId] = true;
         }
 
         // Calculate the VAT based on the index argument
@@ -179,8 +195,6 @@ contract GovDapp {
         uint8 idx,
         string memory comment
     ) public payable {
-        // check that tax id is not 0
-        require(taxId != 0, "Cannot have tax ID = 0");
         // Check if the VAT index is valid
         require(checkIndexValidity(idx), "Invalid index, [0, 1, 2] available");
         // Make sure the comment is not over the character limit
@@ -191,7 +205,10 @@ contract GovDapp {
 
         // Check for tax id validity
         if (!seenId(destination, taxId)) {
-            addressToId[destination] = taxId;
+            // Associate address with id if we see them for the 1st time 
+            addressToId[destination] = AssociatedWithId(taxId, true);
+            // Afterwards, mark this Tax ID as invalid
+            listOfInvalidIds[taxId] = true;
         }
 
         // Calculate the tax
@@ -218,14 +235,25 @@ contract GovDapp {
     }
 
     function seenId(address addr, uint256 id) internal view returns (bool) {
-        if (addressToId[addr] != 0x0) {
-            if (addressToId[addr] == id) {
+        // check if address is already associated with a tax ID
+        if (addressToId[addr].isAssociated) {
+            // in case they match, OK
+            if (addressToId[addr].id == id) {
                 return true;
             } else {
                 revert ("Mismatch between provided and stored tax ID");
             }        
-        } 
-        return false;
+        } else {
+            /*
+            If this is the 1st time the contract sees this address check
+            whether the provided tax ID has not been associated with
+            another address already, if the latter case is false revert
+            */
+            if (listOfInvalidIds[id]) {
+                revert ("Tax ID is already reserved for another address, check your input");
+            }
+            return false;
+        }
     }
 
     // Function that returns the length of a string
