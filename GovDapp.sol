@@ -32,7 +32,7 @@ contract GovDapp {
     MEDIUM: 13%,
     HIGH: 24%
     */
-    enum VatLevels { LOW, MEDIUM, HIGH }
+    enum VatLevels { HIGH, MEDIUM, LOW }
 
     // To store if an address is associated with a Tax ID
     struct AssociatedWithId {
@@ -189,7 +189,7 @@ contract GovDapp {
         
         require(
             utfStringLength(comment) <= MAX_SENTENCE_LENGTH,
-            "Comment >80 characters"
+            "Comment > 80 characters long"
         );
 
         // Check for tax id validity
@@ -322,7 +322,7 @@ contract GovDapp {
         if (index == 1) return VatLevels.MEDIUM;
         if (index == 2) return VatLevels.LOW;
 
-        revert ("Invalid index provided [0,1,2]");
+        revert ("Invalid index provided, [0,1,2] available");
     }
 
     // Checks if the VAT level is in bounds (0,1,2)
