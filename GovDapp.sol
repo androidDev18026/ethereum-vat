@@ -1,6 +1,17 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.13;
 
+/*
+Author: Panagiotis Doupidis
+A.M.: 89
+Date: 15/05/22
+-- Aristotle University of Thessaloniki
+-- Data & Web Science MSc Program
+-- Decentralized Technologies Course
+=========================================
+-- Assignment 2, 2022 - Ethereum
+*/
+
 contract GovDapp {
     // List of goverment controlled addresses for each level
     address[] private govAddresses;
