@@ -318,9 +318,9 @@ contract GovDapp {
     }
 
     function setVatLevel(uint8 index) internal pure returns(VatLevels){
-        if (index == 0) return VatLevels.LOW;
+        if (index == 0) return VatLevels.HIGH;
         if (index == 1) return VatLevels.MEDIUM;
-        if (index == 2) return VatLevels.HIGH;
+        if (index == 2) return VatLevels.LOW;
 
         revert ("Invalid index provided [0,1,2]");
     }
