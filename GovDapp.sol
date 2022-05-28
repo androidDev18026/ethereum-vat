@@ -1,21 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.13;
 
-/*
-Author: Panagiotis Doupidis
-A.M.: 89
-Date: 15/05/22
-
--- Aristotle University of Thessaloniki
--- Data & Web Science MSc Program
--- Decentralized Technologies Course
-=========================================
--- Assignment 2, 2022 - Ethereum
-*/
-
 contract GovDapp {
-    // Array to store the 3 different VAT levels
-    uint8[3] internal taxes;
     // List of goverment controlled addresses for each level
     address[] private govAddresses;
     // Array to store accumulated VAT for each level
@@ -26,20 +12,22 @@ contract GovDapp {
     funds as an associative array mapping TaxID's to
     Wei's
     */
-    mapping(uint256 => uint256) private proceedPerId;
 
-    // Struct to save all the VAT levels
-    struct VatLevels {
-        uint8 high;
-        uint8 mid;
-        uint8 low;
-    }
-
-    // To store the person/address with the most proceeds
-    struct MaxProceeds {
+    // To store the recipient in a structure
+    struct Recipient {
         uint256 id;
         address addr;
+        uint256 earnings;
     }
+
+    /*
+    maps TaxId's (unique) to Recipients to keep track
+    of the one with most proceeds
+    */
+    mapping (uint256 => Recipient) internal Recipients;
+
+    // Struct to save all the VAT levels
+    enum VatLevels { LOW, MEDIUM, HIGH }
 
     // To store if an address is associated with a Tax ID
     struct AssociatedWithId {
@@ -58,15 +46,9 @@ contract GovDapp {
 
     // The owner that deploys the contract
     address public owner;
-    VatLevels public vatLevels = VatLevels(24, 13, 6);
 
-    /* 
-    Declare struct to store information about the
-    recipient with the most proceeds, make sure it's
-    private so that a getter method is not exposed
-    */
-    MaxProceeds private s_maxProceeds;
-    uint256 private maxProceeds;
+    // Holds the recipient with the most proceeds
+    Recipient private maxProceedsRecipient;
 
     // Max amount that VAT doesn't apply to (0.05 ETH -> Wei)
     uint256 internal constant MAX_NONVAT = 50000000000000000;
@@ -78,10 +60,6 @@ contract GovDapp {
         require(addresses.length >= 3, "Goverment addresses must be at least 3");
         // Owner of the contract is the one deploying it
         owner = msg.sender;
-        // Initialize proceeds
-        maxProceeds = 0;
-        // Initialize each of the 3 arrays defined with values
-        taxes = [vatLevels.high, vatLevels.mid, vatLevels.low];
         /* 
         The array to store the gov. controlled addresses is dynamic 
         so that in can potentially be extended to store more than 3
@@ -142,8 +120,9 @@ contract GovDapp {
         uint256 taxId,
         uint8 idx
     ) public payable {
-        // Check if the VAT index is valid
-        require(checkIndexValidity(idx), "Invalid index, [0, 1, 2] available");
+        
+        VatLevels level = setVatLevel(idx);
+        Recipient memory recipient;
 
         // Check for tax id validity
         if (!seenId(destination, taxId)) {
@@ -151,36 +130,40 @@ contract GovDapp {
             addressToId[destination] = AssociatedWithId(taxId, true);
             // Afterwards, mark this Tax ID as invalid
             listOfInvalidIds[taxId] = true;
-        }
+            Recipients[taxId] = Recipient(taxId, destination, uint256(0x0));
+        } 
+        
+        recipient = Recipients[taxId];
 
-        // Calculate the VAT based on the index argument
-        uint256 tax = (msg.value * taxes[idx]) / 100;
+        // Calculate the tax
+        uint256 tax = (msg.value * getVatValue(level)) / 100;
 
         // First, transfer part of the funds to destination address
-        payable(destination).transfer(msg.value - tax);
+        payable(recipient.addr).transfer(msg.value - tax);
         /* 
         Then, make a tax payment to the goverment controlled address
         for that level
         */
-        payable(govAddresses[idx]).transfer(tax);
+        payable(govAddresses[uint8(level)]).transfer(tax);
 
         // Update the proceeds of recipient with the current amount - tax
-        proceedPerId[taxId] += msg.value - tax;
+        recipient.earnings += msg.value - tax;
         // Update the total VAT for that level
-        gatheredVat[idx] += tax;
+        gatheredVat[uint8(level)] += tax;
 
         /*
         Check if the user with the most proceeds has changed
         after this transaction and update the struct accordingly.
         */
-        if (proceedPerId[taxId] > maxProceeds) {
-            s_maxProceeds.id = taxId;
-            s_maxProceeds.addr = destination;
-            maxProceeds = proceedPerId[taxId];
+        if (recipient.earnings > maxProceedsRecipient.earnings) {
+            maxProceedsRecipient = recipient;
         }
 
+        // update the recipients' properties in the map 
+        Recipients[taxId] = recipient;
+
         // Emit event if transaction is successful
-        emit LogMsg2(destination, msg.value, idx);
+        emit LogMsg2(recipient.addr, msg.value, idx);
     }
 
     /* Same as function above with the added functionality of adding comment
@@ -195,9 +178,10 @@ contract GovDapp {
         uint8 idx,
         string memory comment
     ) public payable {
-        // Check if the VAT index is valid
-        require(checkIndexValidity(idx), "Invalid index, [0, 1, 2] available");
-        // Make sure the comment is not over the character limit
+
+        VatLevels level = setVatLevel(idx);
+        Recipient memory recipient;
+        
         require(
             utfStringLength(comment) <= MAX_SENTENCE_LENGTH,
             "Comment >80 characters"
@@ -209,29 +193,38 @@ contract GovDapp {
             addressToId[destination] = AssociatedWithId(taxId, true);
             // Afterwards, mark this Tax ID as invalid
             listOfInvalidIds[taxId] = true;
-        }
+            Recipients[taxId] = Recipient(taxId, destination, uint256(0x0));
+        } 
+        recipient = Recipients[taxId];
 
         // Calculate the tax
-        uint256 tax = (msg.value * taxes[idx]) / 100;
+        uint256 tax = (msg.value * getVatValue(level)) / 100;
 
-        // Pay the recipient after subtracting taxes
-        payable(destination).transfer(msg.value - tax);
-        // Pay the goverment the amount of tax corresponding to that level
-        payable(govAddresses[idx]).transfer(tax);
+        // First, transfer part of the funds to destination address
+        payable(recipient.addr).transfer(msg.value - tax);
+        /* 
+        Then, make a tax payment to the goverment controlled address
+        for that level
+        */
+        payable(govAddresses[uint8(level)]).transfer(tax);
 
-        // Add current tax to the total amassed for that level 
-        gatheredVat[idx] += tax;
-        // Update the proceedings of the recipient
-        proceedPerId[taxId] += msg.value - tax;
+        // Update the proceeds of recipient with the current amount - tax
+        recipient.earnings += msg.value - tax;
+        // Update the total VAT for that level
+        gatheredVat[uint8(level)] += tax;
 
-        // Check to see if the recipient with the most proceeding changed
-        if (proceedPerId[taxId] > maxProceeds) {
-            s_maxProceeds.id = taxId;
-            s_maxProceeds.addr = destination;
-            maxProceeds = proceedPerId[taxId];
+        /*
+        Check if the user with the most proceeds has changed
+        after this transaction and update the struct accordingly.
+        */
+        if (recipient.earnings > maxProceedsRecipient.earnings) {
+            maxProceedsRecipient = recipient;
         }
+        
+        // update the recipients' properties in the map 
+        Recipients[taxId] = recipient;
 
-        emit LogMsg3(destination, msg.value, idx, comment);
+        emit LogMsg3(recipient.addr, msg.value, idx, comment);
     }
 
     function seenId(address addr, uint256 id) internal view returns (bool) {
@@ -277,14 +270,13 @@ contract GovDapp {
     }
 
     // Returns VAT for each level specified, available to everyone
-    function getVatForLevel(uint8 level) public view returns (uint256) {
-        require(checkIndexValidity(level), "Invalid index <> 0, 1, 2");
-        return gatheredVat[level];
+    function getVatForLevel(VatLevels level) public view returns (uint256) {
+        return gatheredVat[uint8(level)];
     }
 
     // Aggregates and returns the total VAT, available to everyone
     function totalVat() public view returns (uint256) {
-        return (gatheredVat[0] + gatheredVat[1] + gatheredVat[2]);
+        return gatheredVat[0] + gatheredVat[1] + gatheredVat[2];
     }
 
     /*
@@ -304,15 +296,33 @@ contract GovDapp {
         )
     {
         return (
-            s_maxProceeds.id,
-            s_maxProceeds.addr,
-            proceedPerId[s_maxProceeds.id]
+            maxProceedsRecipient.id,
+            maxProceedsRecipient.addr,
+            maxProceedsRecipient.earnings
         );
     }
 
+    function getVatValue(VatLevels level) internal pure returns (uint8) {
+        if (level == VatLevels.LOW) {
+            return 6;
+        } else if (level == VatLevels.MEDIUM) {
+            return 13;
+        } else {
+            return 24;
+        }
+    }
+
+    function setVatLevel(uint8 index) internal pure returns(VatLevels){
+        if (index == 0) return VatLevels.LOW;
+        if (index == 1) return VatLevels.MEDIUM;
+        if (index == 2) return VatLevels.HIGH;
+
+        revert ("Invalid index provided [0,1,2]");
+    }
+
     // Checks if the VAT level is in bounds (0,1,2)
-    function checkIndexValidity(uint8 index) internal pure returns (bool) {
-        return (index == 0 || index == 1 || index == 2);
+    function checkIndexValidity(VatLevels level) internal pure returns (bool) {
+        return (uint8(level) == 0 || uint8(level) == 1 || uint8(level) == 2);
     }
 
     // Destroys the contract (permitted only by Owner)
