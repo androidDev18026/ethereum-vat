@@ -26,7 +26,12 @@ contract GovDapp {
     */
     mapping (uint256 => Recipient) internal Recipients;
 
-    // Struct to save all the VAT levels
+    /* 
+    Keep all the VAT levels,
+    LOW: 6%,
+    MEDIUM: 13%,
+    HIGH: 24%
+    */
     enum VatLevels { LOW, MEDIUM, HIGH }
 
     // To store if an address is associated with a Tax ID
