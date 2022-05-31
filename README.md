@@ -40,8 +40,8 @@ This functionality should be available only to the user that deployed the contra
 ## TODO
 - [X] Add comments
 - [X] Remove check balance
-- [X] Add check for tax ID's (ID = 0 not allowed) 
-- [ ] ~~Add struct for printing person with most proceeds~~
+- [X] ~~Add check for tax ID's (ID = 0 not allowed)~~
+- [X] ~~Add struct for printing person with most proceeds~~
 
 *Notes*:
 
