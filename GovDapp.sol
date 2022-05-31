@@ -18,12 +18,6 @@ contract GovDapp {
     // Array to store accumulated VAT for each level
     uint256[3] internal gatheredVat;
 
-    /* 
-    Store proceeds for each person/address that receives
-    funds as an associative array mapping TaxID's to
-    Wei's
-    */
-
     // To store the recipient in a structure
     struct Recipient {
         uint256 id;
@@ -86,7 +80,8 @@ contract GovDapp {
         govAddresses.push(addresses[0]);
         govAddresses.push(addresses[1]);
         govAddresses.push(addresses[2]);
-
+        
+        // VAT initialized to 0 for every level
         gatheredVat = [0, 0, 0];
     }
 
@@ -136,6 +131,11 @@ contract GovDapp {
         uint256 taxId,
         uint8 idx
     ) public payable {
+        /*
+        Validation whether the sender has enough balance to cover
+        the gas and the tx value is handled on the EVM level thus
+        there is no need for us to perform any checks
+        */
         
         VatLevels level = setVatLevel(idx);
         Recipient memory recipient;
@@ -146,6 +146,10 @@ contract GovDapp {
             addressToId[destination] = AssociatedWithId(taxId, true);
             // Afterwards, mark this Tax ID as invalid
             listOfInvalidIds[taxId] = true;
+            /*
+            Create a new recipient with this address & taxID.
+            Also, set the proceedings to 0
+            */
             Recipients[taxId] = Recipient(taxId, destination, uint256(0x0));
         } 
         
@@ -194,7 +198,12 @@ contract GovDapp {
         uint8 idx,
         string memory comment
     ) public payable {
-
+        /*
+        Validation whether the sender has enough balance to cover
+        the gas and the tx value is handled on the EVM level thus
+        there is no need for us to perform any checks
+        */
+        
         VatLevels level = setVatLevel(idx);
         Recipient memory recipient;
         
@@ -209,6 +218,10 @@ contract GovDapp {
             addressToId[destination] = AssociatedWithId(taxId, true);
             // Afterwards, mark this Tax ID as invalid
             listOfInvalidIds[taxId] = true;
+            /*
+            Create a new recipient with this address & taxID.
+            Also, set the proceedings to 0
+            */
             Recipients[taxId] = Recipient(taxId, destination, uint256(0x0));
         } 
         recipient = Recipients[taxId];
